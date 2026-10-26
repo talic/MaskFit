@@ -71,3 +71,10 @@ Pass a folder of frames recorded on the phone (`Documents/capture`, copied off w
 
 The test head is the realistic head from Blender's
 [Human Base Meshes](https://www.blender.org/download/demo/) bundle (CC0).
+
+## Licence
+
+MaskFit is free for non-commercial use under the
+[PolyForm Noncommercial License 1.0.0](LICENSE.md). You can use it, change it and share your changes for
+any non-commercial purpose, as long as you keep the `Required Notice` line that credits the author.
+Commercial use isn't allowed. For a commercial licence, contact [@talic](https://github.com/talic).
