@@ -4,8 +4,6 @@ import Foundation
 enum Letter: String, CaseIterable, Identifiable {
     case a = "A", b = "B", c = "C", d = "D", e = "E"
 
-    enum Axis { case width, height, depth }
-
     var id: String { rawValue }
 
     var name: String {
@@ -48,13 +46,14 @@ enum Letter: String, CaseIterable, Identifiable {
         }
     }
 
-    /// Direction on the mask, for uneven-scaling advice.
-    var axis: Axis {
-        switch self {
-        case .a, .b: .width
-        case .c, .d: .height
-        case .e: .depth
+    /// "3.6 mm narrower": how this distance on the mask compares with what the face needs.
+    func difference(_ mm: Float) -> String {
+        let words: (more: String, less: String) = switch self {
+        case .a, .b: ("wider", "narrower")
+        case .c, .d: ("longer", "shorter")
+        case .e: ("deeper", "shallower")
         }
+        return "\(abs(mm).rounded1.mmText) mm \(mm > 0 ? words.more : words.less)"
     }
 }
 
@@ -159,22 +158,20 @@ struct MaskSizing {
         }
     }
 
-    /// When a check points more than 5% away from the main measurement, the mask was made for different
-    /// proportions; across different directions, scaling each axis separately fixes it.
+    /// When a check points more than 5% away from the main measurement, the mask was made for a face with
+    /// different proportions. The scale still stays even, so the mask keeps the look its designer gave it
+    /// (scaling width and height separately would change it); this says what matching either one costs.
     var disagreement: String? {
         guard let main = mainScale else { return nil }
         let worst = type.checks.filter { $0 != .e }
             .compactMap { l in scale(l).map { (letter: l, scale: $0, diff: abs($0 / main - 1) * 100) } }
             .filter { $0.diff > 5 }
             .max { $0.diff < $1.diff }
-        guard let worst else { return nil }
         let m = type.main
-        if worst.letter.axis != m.axis {
-            let width = m.axis == .width ? main : worst.scale
-            let height = m.axis == .height ? main : worst.scale
-            return "\(m.rawValue) and \(worst.letter.rawValue) disagree by \(Int(worst.diff.rounded()))%, so this mask was made for a face with different proportions. Either scale evenly to \(main.pctText), or unlock the scale in Bambu Studio and set the width (across the eyes) to \(width.pctText) and the height (top to bottom) to \(height.pctText)."
-        }
-        return "\(m.rawValue) suggests \(main.pctText) but \(worst.letter.rawValue) suggests \(worst.scale.pctText), and one scale can't match both. At \(main.pctText) the eye holes will sit off your eyes; if clear vision matters more, use \(worst.scale.pctText)."
+        guard let worst, let maskMain = mask[m], let maskOther = mask[worst.letter],
+              let needMain = target(m), let needOther = target(worst.letter) else { return nil }
+        let o = worst.letter
+        return "\(m.rawValue) and \(o.rawValue) disagree by \(Int(worst.diff.rounded()))%, so this mask was made for a face with different proportions. Keep the scale even so the mask keeps its look, and choose which to match: at \(main.pctText) its \(o.name.lowercased()) (\(o.rawValue)) is \(o.difference(maskOther * main / 100 - needOther)) than you need; at \(worst.scale.pctText) its \(m.name.lowercased()) (\(m.rawValue)) is \(m.difference(maskMain * worst.scale / 100 - needMain)) than you need."
     }
 
     var noseWarning: String? {

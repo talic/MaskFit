@@ -1,0 +1,395 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>MaskFit · Size a mask</title>
+<style>
+:root {
+  --bg-light: #f2f2f7; --bg-dark: #000;
+  --card-light: #fff; --card-dark: #1c1c1e;
+  --fill-light: #f2f2f7; --fill-dark: #2c2c2e;
+  --text-light: #1c1c1e; --text-dark: #f2f2f7;
+  --muted-light: #5f5f66; --muted-dark: #a1a1a8;
+  --line-light: #c6c6cc; --line-dark: #48484c;
+  --accent-light: #0060df; --accent-dark: #4ea1ff;
+  --warn-light: #a34700; --warn-dark: #ffb066;
+  --bg: var(--bg-light); --card: var(--card-light); --fill: var(--fill-light); --text: var(--text-light);
+  --muted: var(--muted-light); --line: var(--line-light); --accent: var(--accent-light); --warn: var(--warn-light);
+  @media (prefers-color-scheme: dark) {
+    --bg: var(--bg-dark); --card: var(--card-dark); --fill: var(--fill-dark); --text: var(--text-dark);
+    --muted: var(--muted-dark); --line: var(--line-dark); --accent: var(--accent-dark); --warn: var(--warn-dark);
+  }
+  color-scheme: light dark;
+  accent-color: var(--accent);
+}
+* { box-sizing: border-box; }
+body { margin: 0; background: var(--bg); color: var(--text); font: 1rem/1.45 system-ui, -apple-system, sans-serif; }
+header { padding: 24px 24px 0; max-width: 1360px; margin: 0 auto; }
+h1 { font-size: 1.75rem; margin: 0; }
+header p { margin: 4px 0 0; color: var(--muted); }
+.layout { display: grid; gap: 24px; padding: 24px; max-width: 1360px; margin: 0 auto; }
+@media (min-width: 960px) {
+  .layout { grid-template-columns: minmax(0, 1fr) 480px; align-items: start; }
+  .view { position: sticky; top: 24px; }
+}
+.view { display: grid; gap: 12px; }
+.stage { position: relative; height: min(72vh, 760px); min-height: 360px; background: var(--card); border-radius: 16px; overflow: hidden; border: 1px solid var(--line); }
+@media (max-width: 959px) { .stage { height: 60vh; } }
+.stage.dragging { outline: 3px dashed var(--accent); outline-offset: -8px; }
+.stage canvas { display: block; }
+.empty { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 12px; padding: 24px; text-align: center; color: var(--muted); }
+.empty strong { color: var(--text); font-size: 1.125rem; }
+.labels { position: absolute; inset: 0; pointer-events: none; }
+.badge { font: 600 0.8125rem/1 ui-monospace, SFMono-Regular, monospace; color: #fff; background: #6e6e73; width: 24px; height: 24px; border-radius: 50%; display: grid; place-items: center; box-shadow: 0 1px 3px #0005; }
+.badge.main { background: var(--accent-light); }
+.tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.note { margin: 0; color: var(--muted); font-size: 0.875rem; }
+.steps { display: grid; gap: 16px; }
+.card { background: var(--card); border-radius: 16px; padding: 18px; border: 0; margin: 0; min-width: 0; }
+legend, .card h2 { float: left; width: 100%; padding: 0; margin: 0 0 4px; font-size: 1rem; font-weight: 650; }
+legend + *, .card h2 + * { clear: both; }
+.hint { margin: 0 0 12px; color: var(--muted); font-size: 0.875rem; }
+.fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 12px; }
+.field { display: grid; gap: 4px; }
+.field label { font-size: 0.875rem; font-weight: 600; }
+.mm { position: relative; }
+.mm::after { content: "mm"; position: absolute; right: 12px; top: 50%; translate: 0 -50%; color: var(--muted); pointer-events: none; }
+input[type=text] { width: 100%; font: inherit; font-variant-numeric: tabular-nums; min-height: 48px; padding: 10px 40px 10px 12px; border-radius: 10px; border: 1px solid var(--line); background: var(--card); color: var(--text); }
+input:focus-visible, button:focus-visible, .option:has(input:focus-visible), .file:has(input:focus-visible) { outline: 3px solid var(--accent); outline-offset: 2px; }
+button, .file { font: inherit; font-weight: 600; min-height: 48px; padding: 10px 16px; border-radius: 12px; border: 1px solid var(--line); background: var(--fill); color: var(--text); cursor: pointer; display: inline-flex; align-items: center; justify-content: center; text-align: center; }
+button.primary, .file.primary { background: var(--accent); border-color: var(--accent); color: var(--card); }
+.file input { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+.options { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px; }
+.option { position: relative; display: grid; gap: 2px; padding: 10px 12px; min-height: 48px; border-radius: 12px; border: 1px solid var(--line); cursor: pointer; }
+.option input { position: absolute; clip-path: inset(50%); width: 1px; height: 1px; overflow: hidden; }
+.option:has(input:checked) { border-color: var(--accent); background: color-mix(in srgb, var(--accent) 12%, transparent); }
+.option b { font-size: 0.9375rem; }
+.option small { color: var(--muted); font-size: 0.8125rem; }
+.tag { justify-self: start; font-size: 0.75rem; font-weight: 600; padding: 1px 8px; border-radius: 99px; background: var(--fill); color: var(--muted); }
+.scale-to { font-size: 0.75rem; font-weight: 650; letter-spacing: 0.04em; color: var(--muted); margin: 0; }
+.big { font-size: 3.25rem; font-weight: 650; line-height: 1.1; margin: 0; font-variant-numeric: tabular-nums; }
+.working { margin: 4px 0 0; color: var(--muted); font-size: 0.9375rem; }
+.callout { margin: 12px 0 0; padding: 12px; border-radius: 10px; background: color-mix(in srgb, var(--warn) 12%, transparent); font-size: 0.9375rem; }
+.callout b { color: var(--warn); }
+.info { margin: 12px 0 0; padding: 12px; border-radius: 10px; background: var(--fill); font-size: 0.9375rem; }
+.downloads { display: grid; gap: 8px; margin-top: 16px; }
+.table-wrap { overflow-x: auto; }
+table { width: 100%; min-width: 400px; border-collapse: collapse; font-size: 0.9375rem; }
+th { text-align: left; font-size: 0.75rem; font-weight: 600; color: var(--muted); padding: 0 6px 6px; }
+td { padding: 8px 6px; border-top: 1px solid var(--line); vertical-align: middle; }
+td.num { font-variant-numeric: tabular-nums; white-space: nowrap; }
+td .what { font-weight: 600; }
+td small { display: block; color: var(--muted); font-size: 0.8125rem; }
+td small.problem { color: var(--warn); font-weight: 600; }
+td input[type=text] { min-height: 40px; padding: 6px 36px 6px 8px; width: 6.5rem; }
+.letter { display: inline-grid; place-items: center; width: 26px; height: 26px; border-radius: 50%; background: var(--fill); font: 600 0.8125rem ui-monospace, SFMono-Regular, monospace; }
+tr.main .letter { background: var(--accent); color: var(--card); }
+ul.tips { margin: 0; padding-left: 1.2em; font-size: 0.9375rem; display: grid; gap: 8px; }
+footer { padding: 0 24px 32px; max-width: 1360px; margin: 0 auto; color: var(--muted); font-size: 0.8125rem; }
+[hidden] { display: none !important; }
+</style>
+<script type="importmap">
+{ "imports": {
+  "three": "https://cdn.jsdelivr.net/npm/three@0.170.0/build/three.module.js",
+  "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.170.0/examples/jsm/"
+} }
+</script>
+</head>
+<body>
+<header>
+  <h1>MaskFit</h1>
+  <p>Load a mask, see your face measurements on it, and download it scaled to fit you.</p>
+</header>
+
+<main class="layout">
+  <section class="view" aria-label="Mask preview">
+    <div class="stage" id="stage">
+      <div class="empty" id="empty">
+        <strong>Drop your mask's STL or 3MF file here</strong>
+        <span>or</span>
+        <label class="file primary">Choose a file<input type="file" accept=".stl,.3mf,model/stl,model/3mf" data-file></label>
+        <span>The file stays on this computer. Nothing is uploaded.</span>
+      </div>
+      <div class="labels" id="labels"></div>
+    </div>
+    <div class="tools" id="tools" hidden>
+      <button type="button" id="side">View from inside</button>
+      <button type="button" id="turn">Turn 90°</button>
+      <button type="button" id="flip">Swap front and back</button>
+      <label class="file">Choose another file<input type="file" accept=".stl,.3mf,model/stl,model/3mf" data-file></label>
+    </div>
+    <p class="note" id="maskNote" aria-live="polite"></p>
+  </section>
+
+  <div class="steps">
+    <form id="form" class="steps">
+      <fieldset class="card">
+        <legend>1 · Your face</legend>
+        <p class="hint">In the MaskFit app, tap <b>Copy measurements</b>, then paste anywhere on this page (⌘V). Or type them in.</p>
+        <div class="fields" id="faceFields"></div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>2 · What kind of mask?</legend>
+        <div class="options" id="types"></div>
+      </fieldset>
+
+      <fieldset class="card">
+        <legend>3 · Padding inside the mask</legend>
+        <div class="options" id="paddings"></div>
+        <p class="hint" style="margin: 10px 0 0">If the designer says they already left room for padding, pick None.</p>
+      </fieldset>
+    </form>
+
+    <section class="card" aria-live="polite" aria-labelledby="resultTitle">
+      <h2 id="resultTitle">Scale</h2>
+      <div id="result"></div>
+    </section>
+
+    <section class="card" aria-labelledby="tableTitle">
+      <h2 id="tableTitle">Measurements</h2>
+      <p class="hint">Found on the inside of the mask. If a line on the mask is in the wrong place, type the right value.</p>
+      <div class="table-wrap">
+        <table>
+          <thead><tr><th scope="col" colspan="2">Measurement</th><th scope="col">You</th><th scope="col">Mask</th><th scope="col">Scale</th></tr></thead>
+          <tbody id="rows"></tbody>
+        </table>
+      </div>
+    </section>
+
+    <section class="card" aria-labelledby="tipsTitle">
+      <h2 id="tipsTitle">Before you print</h2>
+      <ul class="tips">
+        <li><b>Check the lines on the mask.</b> Each letter should sit where the app's diagram shows it, on the inside surface.</li>
+        <li><b>Print a test strip first.</b> In Bambu Studio, use Cut to print just the band at eye level, then try it on.</li>
+      </ul>
+    </section>
+  </div>
+</main>
+<footer>MaskFit · free for non-commercial use under the PolyForm Noncommercial License 1.0.0</footer>
+
+<script type="module">
+import * as THREE from 'three'
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js'
+import { CSS2DRenderer, CSS2DObject } from 'three/addons/renderers/CSS2DRenderer.js'
+import { readMesh, writeSTL, analyse, sizing, LETTERS, TYPES, mmText } from './mask.js'
+
+const $ = id => document.getElementById(id)
+const letters = Object.keys(LETTERS)
+const PADDINGS = [[2, 'None', '2 mm air gap'], [4, 'Thin foam', '4 mm'], [6, 'Thick foam', '6 mm']]
+const state = { tris: null, name: '', found: null, flip: false, turns: 0, inside: false }
+
+// ---- Form
+
+$('faceFields').innerHTML = letters.map(l => `
+  <div class="field">
+    <label for="face-${l}">${l} · ${LETTERS[l].name}</label>
+    <div class="mm"><input type="text" id="face-${l}" name="face-${l}" inputmode="decimal" autocomplete="off" aria-describedby="face-${l}-hint"></div>
+    <small class="hint" id="face-${l}-hint" style="margin:0">${LETTERS[l].onFace}</small>
+  </div>`).join('')
+$('types').innerHTML = Object.entries(TYPES).map(([id, t]) => `
+  <label class="option"><input type="radio" name="type" value="${id}"${id === 'full' ? ' checked' : ''}>
+    <b>${t.title}</b><small>${t.subtitle}</small><span class="tag" data-detected="${id}" hidden>Detected</span></label>`).join('')
+$('paddings').innerHTML = PADDINGS.map(([mm, title, sub]) => `
+  <label class="option"><input type="radio" name="padding" value="${mm}"${mm === 4 ? ' checked' : ''}><b>${title}</b><small>${sub}</small></label>`).join('')
+$('rows').innerHTML = letters.map(l => `
+  <tr id="row-${l}">
+    <td><span class="letter">${l}</span></td>
+    <td><span class="what">${LETTERS[l].name}</span><small>${LETTERS[l].onMask}</small><small data-status></small></td>
+    <td class="num" data-face>–</td>
+    <td class="num"><div class="mm"><input type="text" id="mask-${l}" inputmode="decimal" autocomplete="off" aria-label="${l} on the mask, mm"></div></td>
+    <td class="num" data-scale>–</td>
+  </tr>`).join('')
+
+const num = s => { const v = parseFloat(String(s).replace(',', '.')); return Number.isFinite(v) && v > 0 ? v : null }
+const values = prefix => Object.fromEntries(letters.map(l => [l, num($(`${prefix}-${l}`).value)]))
+const setFace = face => { for (const l of letters) if (face[l] != null) $(`face-${l}`).value = face[l] }
+
+// Face values: the URL fragment (#a=64.3&b=…, never sent to a server), else what was typed last time.
+try { setFace(JSON.parse(localStorage.getItem('maskfit.face') ?? '{}')) } catch {}
+const fromHash = () => {
+  const p = new URLSearchParams(location.hash.slice(1))
+  setFace(Object.fromEntries(letters.map(l => [l, num(p.get(l.toLowerCase()) ?? '')])))
+  update()
+}
+addEventListener('hashchange', fromHash)
+
+// "A Eye spacing: 64.3 mm", one per line, as the app's Copy measurements button writes them.
+document.addEventListener('paste', e => {
+  const text = e.clipboardData?.getData('text') ?? ''
+  const found = Object.fromEntries([...text.matchAll(/^\s*([A-E])\b[^:\n]*:\s*([\d.,]+)\s*mm/gim)].map(m => [m[1].toUpperCase(), num(m[2])]))
+  if (!Object.keys(found).length) return
+  e.preventDefault()
+  setFace(found)
+  update()
+})
+
+$('form').addEventListener('submit', e => e.preventDefault())
+$('form').addEventListener('input', update)
+$('rows').addEventListener('input', update)
+
+// ---- 3D view
+
+const stage = $('stage')
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true })
+renderer.setPixelRatio(Math.min(devicePixelRatio, 2))
+const labels = new CSS2DRenderer({ element: $('labels') })
+const scene = new THREE.Scene()
+const camera = new THREE.PerspectiveCamera(30, 1, 1, 10000)
+const light = new THREE.DirectionalLight(0xffffff, 2.2)
+light.position.set(0.3, 0.4, 1)
+camera.add(light)
+scene.add(camera, new THREE.HemisphereLight(0xffffff, 0x8a8a8a, 1.6))
+const controls = new OrbitControls(camera, renderer.domElement)
+const render = () => { renderer.render(scene, camera); labels.render(scene, camera) }
+controls.addEventListener('change', render)
+let model = null, overlay = null
+
+new ResizeObserver(() => {
+  const { clientWidth: w, clientHeight: h } = stage
+  renderer.setSize(w, h); labels.setSize(w, h)
+  camera.aspect = w / h; camera.updateProjectionMatrix(); render()
+}).observe(stage)
+
+function showMask() {
+  if (!renderer.domElement.isConnected) stage.prepend(renderer.domElement)
+  if (model) { scene.remove(model); model.geometry.dispose() }
+  const geometry = new THREE.BufferGeometry()
+  geometry.setAttribute('position', new THREE.BufferAttribute(state.tris, 3))
+  geometry.computeVertexNormals()
+  model = new THREE.Mesh(geometry, new THREE.MeshStandardMaterial({ color: 0xd8d4cc, roughness: 0.75, side: THREE.DoubleSide }))
+  scene.add(model)
+}
+
+function placeCamera() {
+  const { frame, size } = state.found, [ex, ey, ez] = frame.R.map(v => new THREE.Vector3(...v))
+  // Far enough back that both the mask's height and its width fit, with a margin.
+  const t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2))
+  const centre = new THREE.Vector3(...frame.c), dist = 1.3 * Math.max(size[1] / 2 / t, size[0] / 2 / (t * camera.aspect)) + size[2] / 2
+  const dir = ex.clone().multiplyScalar(0.45).add(ey.clone().multiplyScalar(0.12)).add(ez).normalize()
+  camera.position.copy(centre).addScaledVector(dir, state.inside ? -dist : dist)
+  camera.up.copy(ey)
+  controls.target.copy(centre)
+  controls.update()
+}
+
+function drawLines(main) {
+  if (overlay) { scene.remove(overlay); overlay.traverse(o => o.element?.remove()) }
+  overlay = new THREE.Group()
+  const r = Math.max(...state.found.size) * 0.008
+  for (const [l, [p, q]] of Object.entries(state.found.lines)) {
+    const color = l === main ? 0x0060df : 0x6e6e73
+    const material = { color, depthTest: false, transparent: true }
+    const a = new THREE.Vector3(...p), b = new THREE.Vector3(...q)
+    const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints([a, b]), new THREE.LineBasicMaterial(material))
+    for (const end of [a, b]) {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(r, 12, 8), new THREE.MeshBasicMaterial(material))
+      dot.position.copy(end); dot.renderOrder = 10; overlay.add(dot)
+    }
+    const badge = Object.assign(document.createElement('div'), { className: `badge${l === main ? ' main' : ''}`, textContent: l })
+    const label = new CSS2DObject(badge)
+    label.position.copy(a).lerp(b, 0.5)
+    line.renderOrder = 10
+    overlay.add(line, label)
+  }
+  scene.add(overlay)
+  render()
+}
+
+// ---- Loading a mask
+
+async function load(file) {
+  if (!file) return
+  $('maskNote').textContent = `Measuring ${file.name}…`
+  await new Promise(requestAnimationFrame)
+  try {
+    ({ tris: state.tris, note: state.note } = await readMesh(await file.arrayBuffer()))
+  } catch (err) {
+    $('maskNote').textContent = `${file.name}: ${err.message}`
+    return
+  }
+  state.name = file.name.replace(/\.(stl|3mf)$/i, '')
+  state.flip = false; state.turns = 0; state.inside = false
+  $('side').textContent = 'View from inside'
+  showMask()
+  measure()
+  $('empty').hidden = true
+  $('tools').hidden = false
+}
+
+function measure() {
+  const found = (state.found = analyse(state.tris, { flip: state.flip, turns: state.turns }))
+  for (const l of letters) $(`mask-${l}`).value = found.mask[l] ?? ''
+  document.querySelectorAll('[data-detected]').forEach(tag => (tag.hidden = tag.dataset.detected !== found.type))
+  document.querySelector(`input[name=type][value=${found.type}]`).checked = true
+  $('maskNote').textContent = `${state.name}: ${found.size.join(' × ')} mm, ${(state.tris.length / 9).toLocaleString()} triangles. ${state.note}`
+    + (found.problem ?? (found.reachesCheekbones ? '' : "B isn't measured: this mask doesn't reach back to the cheekbones. ")
+    + 'If the lines look wrong, turn or swap the mask.')
+  placeCamera()
+  update()
+}
+
+document.querySelectorAll('[data-file]').forEach(input => input.addEventListener('change', () => { load(input.files[0]); input.value = '' }))
+stage.addEventListener('dragover', e => { e.preventDefault(); stage.classList.add('dragging') })
+stage.addEventListener('dragleave', () => stage.classList.remove('dragging'))
+stage.addEventListener('drop', e => { e.preventDefault(); stage.classList.remove('dragging'); load(e.dataTransfer.files[0]) })
+$('turn').addEventListener('click', () => { state.turns = (state.turns + 1) % 4; measure() })
+$('flip').addEventListener('click', () => { state.flip = !state.flip; measure() })
+$('side').addEventListener('click', () => {
+  state.inside = !state.inside
+  $('side').textContent = state.inside ? 'View from outside' : 'View from inside'
+  placeCamera()
+})
+
+// ---- Results
+
+function update() {
+  const face = values('face'), mask = values('mask')
+  const type = new FormData($('form')).get('type'), padding = +new FormData($('form')).get('padding')
+  try { localStorage.setItem('maskfit.face', JSON.stringify(face)) } catch {}
+  const s = sizing(face, mask, type, padding), main = TYPES[type].main
+  const checks = Object.fromEntries(s.checks.map(c => [c.letter, c]))
+
+  for (const l of letters) {
+    const row = $(`row-${l}`), check = checks[l], scale = s.scale(l)
+    row.classList.toggle('main', l === main)
+    row.querySelector('[data-face]').textContent = face[l] == null ? '–' : `${mmText(face[l])} mm`
+    row.querySelector('[data-scale]').textContent = scale == null ? '–' : `${mmText(scale)}%`
+    const status = row.querySelector('[data-status]')
+    status.textContent = l === main ? 'Main measurement' : check ? check.status : ''
+    status.className = check?.isProblem ? 'problem' : ''
+  }
+  if (state.found) drawLines(main)
+
+  const out = []
+  if (s.main == null) {
+    const missing = !state.tris ? 'Load a mask file to measure it.'
+      : face[main] == null ? `Enter your ${main} · ${LETTERS[main].name} from the app.`
+      : `${main} · ${LETTERS[main].name} wasn't found on this mask. Type it in the table below, or pick another kind of mask.`
+    out.push(`<p class="working" style="margin:0">${missing}</p>`)
+  } else {
+    out.push(`<p class="scale-to">SCALE THE MASK TO</p><p class="big">${mmText(s.main)}%</p><p class="working">${s.working}</p>`)
+    if (s.looksWrong) out.push(`<p class="callout"><b>That's a big change.</b> Check the file is in millimetres and the mask's ${main} is right.</p>`)
+    if (s.noseWarning) out.push(`<p class="callout"><b>Nose space too shallow.</b> ${s.noseWarning}</p>`)
+    if (s.disagreement) out.push(`<p class="callout"><b>Different proportions.</b> ${s.disagreement}</p>`)
+    if (s.hardwareNote) out.push(`<p class="info"><b>Hardware changes size too.</b> ${s.hardwareNote}</p>`)
+    out.push(`<div class="downloads"><button type="button" class="primary" data-download="${s.main}">Download STL at ${mmText(s.main)}%</button>`
+      + (s.alternative ? `<button type="button" data-download="${s.alternative.scale}">Download at ${mmText(s.alternative.scale)}% to match ${s.alternative.letter} instead</button>` : '')
+      + '</div>')
+  }
+  $('result').innerHTML = out.join('')
+  $('result').querySelectorAll('[data-download]').forEach(b => b.addEventListener('click', () => {
+    const pct = +b.dataset.download
+    const blob = new Blob([writeSTL(state.tris, pct / 100)], { type: 'model/stl' })
+    const a = Object.assign(document.createElement('a'), { href: URL.createObjectURL(blob), download: `${state.name} ${mmText(pct)}%.stl` })
+    a.click()
+    setTimeout(() => URL.revokeObjectURL(a.href), 1000)
+  }))
+}
+
+fromHash()
+</script>
+</body>
+</html>

@@ -38,6 +38,7 @@ Early prototype.
 | `MaskFit/Capture.swift` | Development recorder that saves raw frames for replay on the Mac (remove before release) |
 | `Check/` | Mac checks for the maths above, against a CC0 head with known measurements |
 | `Tools/` | Blender scripts that make the test head data and the diagram renders |
+| `web/` | Web page that measures a mask's STL or 3MF and downloads it scaled; `mask.js` is the geometry, `check.mjs` its check |
 | `MaskFitClip` target | App Clip version; needs a paid Apple developer team |
 
 ## Build and run
@@ -71,6 +72,30 @@ Pass a folder of frames recorded on the phone (`Documents/capture`, copied off w
 
 The test head is the realistic head from Blender's
 [Human Base Meshes](https://www.blender.org/download/demo/) bundle (CC0).
+
+## Web: size a mask from its STL or 3MF
+
+The web page loads a mask's STL or 3MF and finds A–E on its inside. A 3MF is measured as it sits on
+the plate, so any scale already set in Bambu Studio counts. The page uses the object with the most
+triangles and skips Bambu's modifier and negative parts. Downloads are STL. It does that with the same landmark rules
+`FaceMeasurer.swift` uses on the face, because the inside of a mask is a negative of a face. It then
+shows the lines on the mask, works out the scale with the `MaskSizing.swift` rules, and downloads the
+STL scaled. Everything runs in the browser and the file isn't uploaded. To get your measurements in,
+tap **Copy measurements** in the app and paste on the page, or open it with `#a=64.3&b=144.5&…`.
+
+```bash
+python3 -m http.server 8765 --bind 127.0.0.1 --directory web
+```
+
+Then open http://localhost:8765. The check builds a mask from the test head (padded 4 mm, eye holes cut,
+turned and shrunk to 80%) and expects to get the head's measurements back:
+
+```bash
+node web/check.mjs
+```
+
+`node web/check.mjs mask.stl` (or `mask.3mf`) prints what it finds on any mask. `web/mask.js` ports the sizing rules
+from `MaskSizing.swift`, so a change to one needs the same change in the other.
 
 ## Licence
 
