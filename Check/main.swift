@@ -165,7 +165,7 @@ let face: [Letter: Float] = [.a: 64, .b: 145, .c: 119, .d: 44, .e: 33]
 let full = MaskSizing(face: face, type: .full, padding: 4, mask: [.c: 116, .a: 57])
 expect(full.mainScale == 106 && full.working == "Your 119 mm + 4 mm padding = 123 mm, ÷ 116 mm on the mask", "full face: C 116 mm -> 106%")
 expect(full.checks.map(\.status) == ["Suggests 112.3% · disagrees by 6%", "Optional"], "full face: A check disagrees")
-expect(full.disagreement?.contains("width (across the eyes) to 112.3% and the height (top to bottom) to 106%") == true, "full face: uneven-scale advice")
+expect(full.disagreement?.hasSuffix("choose which to match: at 106% its eye spacing (A) is 3.6 mm narrower than you need; at 112.3% its face length (C) is 7.3 mm longer than you need.") == true, "full face: even-scale trade-off")
 expect(full.hardwareNote?.contains("6 mm magnet pocket becomes 6.4 mm") == true, "hardware note")
 let wrap = MaskSizing(face: face, type: .wrap, padding: 4, mask: [.b: 140, .a: 60, .c: 120])
 expect(wrap.mainScale == 109.3 && wrap.working == "Your 145 mm + 2 × 4 mm padding = 153 mm, ÷ 140 mm on the mask", "wraparound: B gets padding on both sides")
