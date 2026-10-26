@@ -27,7 +27,10 @@ struct ContentView: View {
     @State private var scanner = SweepScanner()
 
     var body: some View {
-        if !ARFaceTrackingConfiguration.isSupported {
+        if ProcessInfo.processInfo.arguments.contains("-demoResults") {
+            // Launch argument for checking the results screen (and screenshots) without scanning.
+            ResultsView(summary: .demo) {}
+        } else if !ARFaceTrackingConfiguration.isSupported {
             ContentUnavailableView("Face tracking unavailable", systemImage: "faceid",
                                    description: Text("This needs an iPhone with Face ID.\n\(Device.summary)"))
         } else if let summary = scanner.summary {
@@ -115,69 +118,5 @@ struct ProgressRing: View {
         }
         .allowsHitTesting(false)
         .accessibilityLabel("Scan coverage \(covered.filter { $0 }.count * 100 / max(1, covered.count)) percent")
-    }
-}
-
-struct ResultsView: View {
-    let summary: SweepScanner.Summary
-    let scanAgain: () -> Void
-    @State private var copied = false
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    ForEach(summary.rows) { row in
-                        HStack(spacing: 12) {
-                            Text(row.id).font(.headline.monospaced()).frame(width: 22)
-                            VStack(alignment: .leading, spacing: 2) {
-                                Text(row.name)
-                                Text(meshLine(row)).font(.caption.monospacedDigit()).foregroundStyle(.secondary)
-                            }
-                            Spacer()
-                            Text(row.depth.map { String(format: "%.1f mm", $0) } ?? "–")
-                                .font(.title3.monospacedDigit().weight(.semibold))
-                        }
-                    }
-                } footer: {
-                    Text("Measured on \(summary.points.formatted()) depth points from a \(Int(summary.coverage * 100))% sweep. \"Mesh\" is ARKit's fitted face shape, shown for comparison.")
-                }
-                if summary.timedOut {
-                    Section {
-                        Label("The scan stopped before every measurement settled. Scan again, turning your head slowly all the way round.",
-                              systemImage: "exclamationmark.triangle")
-                    }
-                }
-                Section {
-                    Text("\(Device.summary)\n\(summary.depthInfo) · \(summary.convention) · fit \(summary.alignmentMM.isNaN ? "–" : String(format: "%.1f mm", summary.alignmentMM))")
-                        .font(.footnote)
-                    Button(copied ? "Copied" : "Copy as CSV") {
-                        UIPasteboard.general.string = csv
-                        copied = true
-                    }
-                    Button("Scan again", action: scanAgain)
-                }
-            }
-            .navigationTitle("Scan result")
-        }
-    }
-
-    private func meshLine(_ row: SweepScanner.Summary.Row) -> String {
-        guard let mesh = row.mesh else { return "Mesh –" }
-        guard let depth = row.depth else { return String(format: "Mesh %.1f mm", mesh) }
-        return String(format: "Mesh %.1f mm (%+.1f)", mesh, mesh - depth)
-    }
-
-    /// One header line and one data line, so scans from several people paste into one sheet.
-    private var csv: String {
-        let ids = summary.rows.map(\.id)
-        let f = { (v: Float?) in v.map { String(format: "%.1f", $0) } ?? "" }
-        let header = ["date", "device", "build"] + ids + ids.map { "mesh" + $0 }
-            + ["points", "coverage", "fitMM", "orientation", "depth", "timedOut"]
-        let row = [ISO8601DateFormatter().string(from: .now), Device.model, Device.isAppClip ? "clip" : "app"]
-            + summary.rows.map { f($0.depth) } + summary.rows.map { f($0.mesh) }
-            + ["\(summary.points)", String(format: "%.2f", summary.coverage), f(summary.alignmentMM.isNaN ? nil : summary.alignmentMM),
-               summary.convention, summary.depthInfo, summary.timedOut ? "1" : "0"]
-        return header.joined(separator: ",") + "\n" + row.joined(separator: ",")
     }
 }

@@ -29,6 +29,12 @@ final class SweepScanner: NSObject, ARSessionDelegate, ARSCNViewDelegate {
         let convention: String
         let depthInfo: String
         let timedOut: Bool
+
+        /// A real scan from an iPhone 16 Pro Max, for the -demoResults launch argument.
+        static let demo = Summary(
+            rows: zip(SweepScanner.names, [(60.7, 60.7), (145.9, 147.5), (131.5, 131.8), (51.0, 51.8), (38.2, 36.0)] as [(Float, Float)])
+                .map { Row(id: $0.0.0, name: $0.0.1, depth: $0.1.0, mesh: $0.1.1) },
+            points: 44892, coverage: 1, alignmentMM: 2.3, convention: "standard", depthInfo: "640×480 calib", timedOut: false)
     }
 
     static let segments = 36

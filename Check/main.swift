@@ -1,6 +1,6 @@
 // Checks the measurement and depth-fusion maths against a head with known measurements, on the Mac.
 // Run from the MaskFit folder:
-//   swiftc -O MaskFit/FaceMeasurer.swift MaskFit/DepthFusion.swift Check/main.swift -o /tmp/facecheck && /tmp/facecheck Check
+//   swiftc -O MaskFit/FaceMeasurer.swift MaskFit/DepthFusion.swift MaskFit/MaskSizing.swift Check/main.swift -o /tmp/facecheck && /tmp/facecheck Check
 // head.json comes from Tools/export_face.py; synth.json/.bin from Check/make_synth.py (both need Blender and the CC0 head).
 import Foundation
 import simd
@@ -154,6 +154,27 @@ for f in frames { cloud.add(f, convention: .standard, region: region, step: 1) }
 let points = cloud.points(minCount: 2)
 print("\nFused \(frames.count) frames into \(cloud.cellCount) cells, \(points.count) seen twice or more")
 report("Fused depth points", FaceMeasurer(triangleIndices: []).measure(vertices: points, leftEye: leftEye, rightEye: rightEye, bridgeY: onMesh?.bridgeY))
+
+// 3. Mask sizing advice, same cases as the results-screen mockup.
+print("\nMask sizing")
+func expect(_ ok: Bool, _ what: String) {
+    print(ok ? "  ok    " : "  WRONG ", what)
+    pass = pass && ok
+}
+let face: [Letter: Float] = [.a: 64, .b: 145, .c: 119, .d: 44, .e: 33]
+let full = MaskSizing(face: face, type: .full, padding: 4, mask: [.c: 116, .a: 57])
+expect(full.mainScale == 106 && full.working == "Your 119 mm + 4 mm padding = 123 mm, ÷ 116 mm on the mask", "full face: C 116 mm -> 106%")
+expect(full.checks.map(\.status) == ["Suggests 112.3% · disagrees by 6%", "Optional"], "full face: A check disagrees")
+expect(full.disagreement?.contains("width (across the eyes) to 112.3% and the height (top to bottom) to 106%") == true, "full face: uneven-scale advice")
+expect(full.hardwareNote?.contains("6 mm magnet pocket becomes 6.4 mm") == true, "hardware note")
+let wrap = MaskSizing(face: face, type: .wrap, padding: 4, mask: [.b: 140, .a: 60, .c: 120])
+expect(wrap.mainScale == 109.3 && wrap.working == "Your 145 mm + 2 × 4 mm padding = 153 mm, ÷ 140 mm on the mask", "wraparound: B gets padding on both sides")
+expect(wrap.checks.map(\.status) == ["Suggests 102.5% · disagrees by 6%", "Suggests 106.7% · agrees", "Optional"], "wraparound: checks")
+let half = MaskSizing(face: face, type: .half, padding: 6, mask: [.a: 62, .d: 40, .e: 28])
+expect(half.mainScale == 103.2 && half.working == "Your 64 mm, ÷ 62 mm on the mask", "half mask: no padding on eye spacing")
+expect(half.noseWarning == "At 103.2% the nose space is 28.9 mm deep, and your nose needs 33 mm. Scale to at least 117.9%.", "half mask: nose warning")
+expect(MaskSizing(face: face, type: .eye, padding: 4, mask: [.a: 30]).looksWrong, "eye mask: 213% flagged as a likely mis-measure")
+expect(MaskSizing(face: face, type: .eye, padding: 4, mask: [:]).mainScale == nil, "no mask measurement: no scale")
 
 print(pass ? "\nPASS (all within 3 mm)" : "\nFAIL")
 exit(pass ? 0 : 1)
